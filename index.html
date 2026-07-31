@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Listahan ng Utang</title>
+<meta name="description" content="Sari-sari store utang (debt) tracker with customer ledgers, filters, and dashboard.">
+<meta name="theme-color" content="#B0492E">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/icon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Listahan ng Utang">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F6EFDC;
+    --paper-line: #D9CBAA;
+    --card: #FBF6E9;
+    --ink: #2B3654;
+    --ink-soft: #5B6584;
+    --rust: #B0492E;
+    --rust-dark: #7E331F;
+    --sage: #55764A;
+    --sage-dark: #3C5433;
+    --pencil: #8A8065;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    font-family: 'Inter', sans-serif;
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 20px 80px; }
+  .ledger {
+    position: relative;
+    background: var(--card);
+    margin-top: 32px;
+    border: 1px solid var(--paper-line);
+    border-radius: 2px;
+    padding: 40px 32px 32px 68px;
+    background-image: repeating-linear-gradient(
+      to bottom, transparent, transparent 35px, var(--paper-line) 36px
+    );
+    background-position: 0 96px;
+  }
+  .ledger::before {
+    content: "";
+    position: absolute;
+    left: 40px; top: 0; bottom: 0;
+    width: 1.5px;
+    background: var(--rust);
+    opacity: 0.55;
+  }
+  .holes { position: absolute; left: 14px; top: 24px; display: flex; flex-direction: column; gap: 64px; }
+  .holes span { width: 9px; height: 9px; border-radius: 50%; background: var(--paper); border: 1px solid var(--paper-line); display: block; }
+  header { padding: 28px 0 8px; }
+  h1 {
+    font-family: 'Special Elite', monospace;
+    font-size: 30px;
+    margin: 0 0 4px;
+    color: var(--ink);
+    letter-spacing: 0.5px;
+  }
+  .sub { color: var(--ink-soft); font-size: 14px; margin: 0 0 20px; }
+  .section-title { font-family: 'Special Elite', monospace; font-size: 15px; margin: 22px 0 10px; color: var(--ink); letter-spacing: 0.3px; }
+  .totals { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .total-card {
+    background: var(--paper);
+    border: 1px solid var(--paper-line);
+    border-radius: 6px;
+    padding: 10px 16px;
+    min-width: 140px;
+    flex: 1 1 140px;
+  }
+  .total-card .label { font-size: 12px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.5px; }
+  .total-card .value { font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 600; color: var(--rust-dark); }
+  .total-card.ok .value { color: var(--sage-dark); }
+
+  .activity-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; }
+  .activity-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    width: 100%; text-align: left; background: var(--paper); border: 1px solid var(--paper-line);
+    border-radius: 6px; padding: 8px 12px; font-family: 'Inter', sans-serif; font-size: 13px; color: var(--ink);
+    cursor: pointer;
+  }
+  .activity-row:hover { background: #fff; border-color: var(--rust); }
+  .activity-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  .activity-cust { font-weight: 600; }
+  .activity-desc { color: var(--ink-soft); font-size: 12px; }
+  .activity-amt { font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: var(--rust-dark); white-space: nowrap; }
+  .activity-amt.pay { color: var(--sage-dark); }
+
+  .add-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .filters-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: none; border: none; padding: 4px 0; margin-bottom: 8px;
+    color: var(--ink-soft); font-family: inherit; font-size: 13px; font-weight: 500;
+    cursor: pointer;
+  }
+  .filters-toggle:hover { color: var(--ink); background: none; }
+  .filters-toggle .chevron { color: var(--ink-soft); font-size: 11px; width: 10px; display: inline-block; }
+  .filter-active-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--rust); display: inline-block; margin-left: 2px; }
+  .filter-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+  .filter-row input, .filter-row select { font-size: 13px; padding: 7px 10px; }
+  #searchInput { flex: 1; min-width: 140px; }
+  .limit-row { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--ink-soft); margin-bottom: 24px; flex-wrap: wrap; }
+  .limit-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .limit-toggle input[type="checkbox"] { width: 15px; height: 15px; padding: 0; cursor: pointer; }
+  .limit-amount-wrap { display: inline-flex; align-items: center; gap: 6px; }
+  .limit-row input[type="number"] { width: 90px; padding: 6px 10px; font-size: 13px; }
+  .limit-row input:disabled { background: var(--paper); color: var(--pencil); cursor: not-allowed; }
+  .pricebook { margin-bottom: 24px; border: 1px solid var(--paper-line); border-radius: 6px; padding: 10px 14px; background: var(--paper); }
+  .pricebook summary { cursor: pointer; font-size: 13px; font-weight: 500; color: var(--ink); }
+  .pricebook-hint { font-size: 12px; color: var(--ink-soft); margin: 8px 0 10px; }
+  .pb-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; }
+  .pb-row .pb-name { flex: 1; color: var(--ink); }
+  .pb-row input { width: 84px; padding: 5px 8px; font-size: 13px; }
+  .pricebook-add { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .pricebook-add input { font-size: 13px; padding: 6px 10px; }
+  .pricebook-add input:first-child { flex: 1; min-width: 100px; }
+  input, select {
+    font-family: 'Inter', sans-serif;
+    padding: 9px 12px;
+    border: 1px solid var(--paper-line);
+    border-radius: 6px;
+    background: #fff;
+    font-size: 14px;
+    color: var(--ink);
+  }
+  input:focus, select:focus { outline: 2px solid var(--rust); outline-offset: 1px; }
+  #newName { flex: 1; min-width: 140px; }
+  button {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+    padding: 9px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--rust);
+    background: var(--rust);
+    color: #fff;
+    cursor: pointer;
+  }
+  button:hover { background: var(--rust-dark); border-color: var(--rust-dark); }
+  button.ghost { background: transparent; color: var(--ink-soft); border-color: var(--paper-line); }
+  button.ghost:hover { background: var(--paper); color: var(--ink); }
+  button.small { padding: 5px 10px; font-size: 12.5px; }
+
+  /* Customer list cards */
+  .cust-card {
+    display: block; width: 100%; text-align: left; background: none; border: none;
+    border-top: 1px dashed var(--paper-line); border-radius: 0; padding: 14px 2px; cursor: pointer;
+    color: var(--ink); font-family: inherit;
+  }
+  .cust-card:first-of-type { border-top: none; }
+  .cust-card:hover { background: var(--paper); }
+  .cust-card-top { display: flex; align-items: center; gap: 8px; }
+  .cust-card-bottom { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 4px; }
+  .cust-name { font-family: 'Special Elite', monospace; font-size: 17px; }
+  .badge-limit { font-size: 11px; background: var(--rust); color: #fff; padding: 2px 8px; border-radius: 10px; font-family: 'Inter', sans-serif; font-weight: 500; }
+  .cust-balance { font-family: 'IBM Plex Mono', monospace; font-size: 16px; font-weight: 600; color: var(--rust-dark); }
+  .cust-balance.zero { color: var(--sage-dark); }
+  .paid-full { font-size: 12px; color: var(--sage-dark); }
+  .last-payment { font-size: 12px; color: var(--ink-soft); }
+
+  /* Customer detail view */
+  .detail-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 14px 0 4px; }
+  .detail-head h2 { font-family: 'Special Elite', monospace; font-size: 22px; margin: 0; color: var(--ink); }
+
+  .entries { margin-top: 6px; }
+  .entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    padding: 8px 0;
+    font-size: 14px;
+    border-bottom: 1px dashed var(--paper-line);
+  }
+  .entry-info { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; flex: 1 1 220px; min-width: 0; }
+  .entry-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }
+  .entry .date { color: var(--pencil); font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; white-space: nowrap; }
+  .entry .item { color: var(--ink); }
+  .entry .item-meta { color: var(--pencil); font-size: 12px; font-style: italic; }
+  .entry .qty-unit { color: var(--pencil); font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; white-space: nowrap; }
+  .entry .amt { font-family: 'IBM Plex Mono', monospace; font-weight: 600; text-align: right; white-space: nowrap; }
+  .entry .run-bal { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--ink-soft); white-space: nowrap; }
+  .entry.paid .item, .entry.paid .amt, .entry.paid .date, .entry.paid .qty-unit { text-decoration: line-through; color: var(--pencil); opacity: 0.65; }
+  .dup-warning {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    background: #FBEAE3;
+    border: 1px solid var(--rust);
+    color: var(--rust-dark);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    margin: -8px 0 16px;
+  }
+  .unit-in { width: 100px; }
+  .payment-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+  .payment-row input { width: 100px; }
+  .payment-preview { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--ink-soft); }
+  .payment-preview .rem { font-weight: 600; color: var(--sage-dark); }
+  .entry.payment .item { color: var(--sage-dark); font-weight: 500; }
+  .entry.payment .amt { color: var(--sage-dark); }
+  .entry-form { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+  .entry-form input { font-size: 13px; padding: 6px 10px; }
+  .entry-form .item-in { flex: 1; min-width: 100px; }
+  .entry-form .qty-in { width: 64px; }
+  .entry-form .price-in { width: 84px; }
+  .edit-row { border: 1px solid var(--paper-line); border-radius: 6px; padding: 6px 8px; background: var(--paper); }
+  .remove-row { margin-top: 18px; }
+  .confirm-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .confirm-text { font-size: 13px; color: var(--ink); }
+  button.danger { background: var(--rust); border-color: var(--rust); color: #fff; }
+  button.danger:hover { background: var(--rust-dark); border-color: var(--rust-dark); }
+  .icon-btn { background: transparent; border: none; color: var(--pencil); cursor: pointer; padding: 2px 4px; font-size: 13px; }
+  .icon-btn:hover { color: var(--rust-dark); }
+  .empty { color: var(--ink-soft); font-size: 14px; padding: 20px 0; text-align: center; }
+  .loading { color: var(--ink-soft); font-size: 14px; padding: 40px 0; text-align: center; }
+
+  /* ---------- Laptop / wider screens ---------- */
+  @media (min-width: 1024px) {
+    .wrap { max-width: 880px; }
+    .ledger { padding: 44px 44px 36px 76px; }
+  }
+
+  /* ---------- Mobile / narrow screens ---------- */
+  @media (max-width: 640px) {
+    .wrap { padding: 0 8px 60px; }
+    .ledger { padding: 22px 14px 22px 36px; border-radius: 0; }
+    .ledger::before { left: 18px; }
+    .holes { left: 5px; gap: 46px; }
+    .holes span { width: 7px; height: 7px; }
+    h1 { font-size: 22px; }
+    .sub { font-size: 12.5px; }
+    .totals { gap: 8px; }
+    .total-card { flex: 1 1 calc(50% - 8px); min-width: 0; padding: 8px 12px; }
+    .total-card .value { font-size: 17px; }
+    .add-row { flex-direction: column; align-items: stretch; }
+    .filter-row { flex-direction: column; align-items: stretch; }
+    .filter-row input, .filter-row select { width: 100%; }
+    .limit-row { flex-wrap: wrap; }
+    .pricebook-add { flex-direction: column; align-items: stretch; }
+    .cust-name { font-size: 16px; }
+    .cust-balance { font-size: 15px; }
+    .entry-form { flex-direction: column; align-items: stretch; }
+    .entry-form input { width: 100%; }
+    .payment-row { flex-direction: column; align-items: stretch; }
+    .payment-row input { width: 100%; }
+    .payment-preview { white-space: normal; }
+    .entry-right { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="ledger">
+    <div class="holes"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+
+    <div id="listView">
+      <header>
+        <h1>Listahan ng Utang</h1>
+        <p class="sub">Sari-sari store debt ledger &mdash; kept right here on this device.</p>
+        <div class="totals" id="totals"></div>
+
+        <div class="section-title">Recent activity</div>
+        <div class="activity-list" id="recentActivity"></div>
+
+        <div class="add-row">
+          <input id="newName" type="text" placeholder="Pangalan (customer name)" />
+          <button id="addCustBtn">Add customer</button>
+        </div>
+        <div id="dupWarning" class="dup-warning" style="display:none;">
+          <span>A customer named "<span id="dupName"></span>" already exists.</span>
+          <button class="small" id="dupConfirmBtn">Add anyway</button>
+          <button class="small ghost" id="dupOpenBtn">Open existing</button>
+          <button class="small ghost" id="dupCancelBtn">Cancel</button>
+        </div>
+        <button type="button" id="filtersToggleBtn" class="filters-toggle" aria-expanded="false">
+          <span class="chevron" id="filtersChevron">&#9656;</span> Search &amp; sort
+          <span class="filter-active-dot" id="filterActiveDot" style="display:none;"></span>
+        </button>
+        <div class="filter-row" id="filterRow" style="display:none;">
+          <input id="searchInput" type="text" placeholder="Search customer&hellip;" />
+          <select id="sortSelect">
+            <option value="name">Sort: Name (A-Z)</option>
+            <option value="dateAdded">Sort: Date added (newest)</option>
+            <option value="balance">Sort: Balance (highest first)</option>
+            <option value="recent">Sort: Most recent activity</option>
+            <option value="overdue">Sort: Most overdue first</option>
+            <option value="stale">Sort: Longest since payment</option>
+          </select>
+          <select id="filterSelect">
+            <option value="all">Show: All customers</option>
+            <option value="overlimit">Show: Over limit only</option>
+            <option value="unpaid">Show: Has unpaid balance</option>
+          </select>
+        </div>
+        <div class="limit-row">
+          <label class="limit-toggle">
+            <input type="checkbox" id="limitEnabledCheck" />
+            Enable credit limit warning
+          </label>
+          <span class="limit-amount-wrap" id="limitAmountWrap" style="display:none;">
+            <span>at</span>
+            <span>&#8369;</span>
+            <input id="limitInput" type="number" min="0" step="1" value="0" />
+          </span>
+        </div>
+        <details class="pricebook">
+          <summary>Item prices</summary>
+          <p class="pricebook-hint">Saved prices auto-fill when you type a matching item name below. Adjust anytime as prices change.</p>
+          <div id="priceBookList"></div>
+          <div class="pricebook-add">
+            <input id="pbItemName" type="text" placeholder="Item name" />
+            <input id="pbItemPrice" type="number" step="0.01" min="0" placeholder="Price" />
+            <button class="small" id="pbAddBtn">Save price</button>
+          </div>
+        </details>
+      </header>
+      <div class="section-title">Customers</div>
+      <div id="customerList"><div class="loading">Loading ledger&hellip;</div></div>
+    </div>
+
+    <div id="detailView" style="display:none;"></div>
+  </div>
+</div>
+<datalist id="unitOptions">
+  <option value="piece"></option>
+  <option value="kilo"></option>
+  <option value="pack"></option>
+  <option value="sachet"></option>
+  <option value="bottle"></option>
+  <option value="can"></option>
+  <option value="sack"></option>
+  <option value="box"></option>
+  <option value="dozen"></option>
+  <option value="liter"></option>
+  <option value="milliliter"></option>
+  <option value="gram"></option>
+  <option value="tray"></option>
+</datalist>
+<datalist id="sizeOptions">
+  <option value="20g"></option>
+  <option value="50g"></option>
+  <option value="80g"></option>
+  <option value="100g"></option>
+  <option value="250mL"></option>
+  <option value="500mL"></option>
+  <option value="1L"></option>
+  <option value="Small"></option>
+  <option value="Medium"></option>
+  <option value="Large"></option>
+</datalist>
+
+<script>
+const STORAGE_KEY = 'utang-customers';
+const PRICEBOOK_KEY = 'utang-pricebook';
+let customers = [];
+let priceBook = {};
+let loaded = false;
+let searchTerm = '';
+let sortBy = 'name';
+let filterBy = 'all';
+let creditLimit = 0;
+let limitEnabled = false;
+let deleteConfirmId = null;
+let pendingDupName = null;
+let currentView = 'list';
+let currentCustId = null;
+let editingEntryId = null;
+
+function uid() { return Math.random().toString(36).slice(2, 9); }
+function peso(n) { return '\u20B1' + Number(n).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+function todayStr() {
+  const d = new Date();
+  return (d.getMonth()+1) + '/' + d.getDate() + '/' + String(d.getFullYear()).slice(2);
+}
+function timeStr() {
+  const d = new Date();
+  return d.toLocaleTimeString('en-PH', {hour: 'numeric', minute: '2-digit'});
+}
+function custBalance(c) {
+  return c.entries.filter(e => !e.paid).reduce((s, e) => s + Number(e.amount), 0);
+}
+function isOverLimit(c) {
+  return limitEnabled && custBalance(c) > creditLimit;
+}
+function totalPurchases(c) {
+  return c.entries.filter(e => e.type !== 'payment').reduce((s, e) => s + Number(e.amount), 0);
+}
+function totalPaidAmount(c) {
+  const paidPayments = c.entries.filter(e => e.type === 'payment').reduce((s, e) => s + Math.abs(Number(e.amount)), 0);
+  const paidItems = c.entries.filter(e => e.type !== 'payment' && e.paid).reduce((s, e) => s + Number(e.amount), 0);
+  return paidPayments + paidItems;
+}
+function lastActivityTs(c) {
+  let max = c.createdAt || 0;
+  c.entries.forEach(e => { if (e.ts && e.ts > max) max = e.ts; });
+  return max;
+}
+function updatePaidInFull(c) {
+  const bal = custBalance(c);
+  if (bal === 0 && c.entries.length > 0) {
+    if (!c.paidInFullDate) { c.paidInFullDate = todayStr(); c.paidInFullTime = timeStr(); }
+  } else {
+    c.paidInFullDate = null;
+    c.paidInFullTime = null;
+  }
+}
+function daysSincePayment(c) {
+  if (!c.lastPaymentTs) return null;
+  const diffMs = Date.now() - c.lastPaymentTs;
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+}
+function lastPaymentLabel(c) {
+  const days = daysSincePayment(c);
+  if (days === null) return 'No payments yet';
+  if (days === 0) return 'Last payment: today';
+  if (days === 1) return 'Last payment: 1 day ago';
+  return `Last payment: ${days} days ago`;
+}
+function oldestUnpaidTs(c) {
+  const unpaid = c.entries.filter(e => !e.paid);
+  if (!unpaid.length) return null;
+  return Math.min(...unpaid.map(e => e.ts || Date.now()));
+}
+function collectedInRange(sinceTs) {
+  let total = 0;
+  customers.forEach(c => {
+    c.entries.forEach(e => {
+      if (e.type === 'payment' && e.ts && e.ts >= sinceTs) total += Math.abs(Number(e.amount));
+      else if (e.paid && e.paidAt && e.paidAt >= sinceTs) total += Number(e.amount);
+    });
+  });
+  return total;
+}
+
+// Storage backend: plain browser localStorage, so this works on any
+// normal web host (GitHub Pages, Netlify, etc.), not just inside Claude.
+const storage = {
+  async get(key) {
+    const v = localStorage.getItem(key);
+    return v !== null ? { key, value: v } : null;
+  },
+  async set(key, value) {
+    localStorage.setItem(key, value);
+    return { key, value };
+  }
+};
+
+async function save() {
+  try {
+    await storage.set(STORAGE_KEY, JSON.stringify(customers));
+  } catch (err) {
+    console.error('Save failed', err);
+  }
+}
+async function savePriceBook() {
+  try {
+    await storage.set(PRICEBOOK_KEY, JSON.stringify(priceBook));
+  } catch (err) {
+    console.error('Save price book failed', err);
+  }
+}
+
+async function load() {
+  try {
+    const res = await storage.get(STORAGE_KEY);
+    customers = res ? JSON.parse(res.value) : [];
+  } catch (err) {
+    customers = [];
+  }
+  customers.forEach(c => { if (!c.createdAt) c.createdAt = (c.entries[0] && c.entries[0].ts) || 0; });
+  try {
+    const res = await storage.get(PRICEBOOK_KEY);
+    priceBook = res ? JSON.parse(res.value) : {};
+  } catch (err) {
+    priceBook = {};
+  }
+  creditLimit = 0;
+  limitEnabled = false;
+  document.getElementById('limitInput').value = creditLimit;
+  document.getElementById('limitEnabledCheck').checked = false;
+  document.querySelector('#filterSelect option[value="overlimit"]').disabled = true;
+  loaded = true;
+  render();
+}
+
+function renderPriceBook() {
+  const el = document.getElementById('priceBookList');
+  const names = Object.keys(priceBook).sort((a, b) => a.localeCompare(b));
+  if (!names.length) {
+    el.innerHTML = '<p class="empty" style="padding:6px 0;">No saved prices yet.</p>';
+    return;
+  }
+  el.innerHTML = names.map(name => `
+    <div class="pb-row">
+      <span class="pb-name">${escapeHtml(name)}</span>
+      <span>&#8369;</span>
+      <input type="number" step="0.01" min="0" value="${priceBook[name]}" data-pb-name="${escapeHtml(name)}" class="pb-price-in" />
+      <button class="icon-btn" data-action="pbRemove" data-pb-name="${escapeHtml(name)}" aria-label="Remove saved price">Del</button>
+    </div>
+  `).join('');
+}
+
+function render() {
+  if (currentView === 'detail' && currentCustId && customers.find(c => c.id === currentCustId)) {
+    document.getElementById('listView').style.display = 'none';
+    document.getElementById('detailView').style.display = 'block';
+    renderDetail();
+  } else {
+    currentView = 'list';
+    currentCustId = null;
+    document.getElementById('listView').style.display = 'block';
+    document.getElementById('detailView').style.display = 'none';
+    renderList();
+  }
+}
+
+function renderList() {
+  const listEl = document.getElementById('customerList');
+  const totalsEl = document.getElementById('totals');
+  const activityEl = document.getElementById('recentActivity');
+  renderPriceBook();
+
+  const filtersActive = filterBy !== 'all' || searchTerm.trim() !== '' || sortBy !== 'name';
+  document.getElementById('filterActiveDot').style.display = filtersActive ? 'inline-block' : 'none';
+
+  const grandTotal = customers.reduce((s, c) => s + custBalance(c), 0);
+  const numOwing = customers.filter(c => custBalance(c) > 0).length;
+  const numOverLimit = customers.filter(c => isOverLimit(c)).length;
+  const now = new Date();
+  const weekAgoTs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const monthStartTs = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const weekCollected = collectedInRange(weekAgoTs);
+  const monthCollected = collectedInRange(monthStartTs);
+  totalsEl.innerHTML = `
+    <div class="total-card ${grandTotal === 0 ? 'ok' : ''}">
+      <div class="label">Total outstanding</div>
+      <div class="value">${peso(grandTotal)}</div>
+    </div>
+    <div class="total-card">
+      <div class="label">Customers with debt</div>
+      <div class="value">${numOwing}</div>
+    </div>
+    <div class="total-card ${limitEnabled && numOverLimit > 0 ? '' : 'ok'}">
+      <div class="label">Over credit limit</div>
+      <div class="value">${limitEnabled ? numOverLimit : '&mdash;'}</div>
+    </div>
+    <div class="total-card ok">
+      <div class="label">Collected (7 days)</div>
+      <div class="value">${peso(weekCollected)}</div>
+    </div>
+    <div class="total-card ok">
+      <div class="label">Collected (this month)</div>
+      <div class="value">${peso(monthCollected)}</div>
+    </div>
+  `;
+
+  const allTxns = [];
+  customers.forEach(c => c.entries.forEach(e => allTxns.push(Object.assign({}, e, { custId: c.id, custName: c.name }))));
+  allTxns.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  const recent = allTxns.slice(0, 6);
+  activityEl.innerHTML = recent.length ? recent.map(e => `
+    <button type="button" class="activity-row" data-action="openDetail" data-cust="${e.custId}">
+      <span class="activity-main">
+        <span class="activity-cust">${escapeHtml(e.custName)}</span>
+        <span class="activity-desc">${e.type === 'payment' ? 'Payment received' : escapeHtml(e.item)}</span>
+      </span>
+      <span class="activity-amt ${e.type === 'payment' ? 'pay' : ''}">${e.type === 'payment' ? '&minus;' : ''}${peso(Math.abs(e.amount))}</span>
+    </button>
+  `).join('') : '<p class="empty" style="padding:8px 0;">No transactions yet.</p>';
+
+  if (!customers.length) {
+    listEl.innerHTML = '<div class="empty">Wala pang customer. Add one above to start the ledger.</div>';
+    return;
+  }
+
+  let visible = customers.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  if (filterBy === 'overlimit') {
+    visible = visible.filter(c => isOverLimit(c));
+  } else if (filterBy === 'unpaid') {
+    visible = visible.filter(c => custBalance(c) > 0);
+  }
+  if (sortBy === 'balance') {
+    visible = visible.slice().sort((a, b) => custBalance(b) - custBalance(a));
+  } else if (sortBy === 'recent') {
+    visible = visible.slice().sort((a, b) => lastActivityTs(b) - lastActivityTs(a));
+  } else if (sortBy === 'dateAdded') {
+    visible = visible.slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  } else if (sortBy === 'overdue') {
+    visible = visible.slice().sort((a, b) => {
+      const ta = oldestUnpaidTs(a); const tb = oldestUnpaidTs(b);
+      if (ta === null && tb === null) return 0;
+      if (ta === null) return 1;
+      if (tb === null) return -1;
+      return ta - tb;
+    });
+  } else if (sortBy === 'stale') {
+    visible = visible.slice().sort((a, b) => {
+      const da = daysSincePayment(a); const db = daysSincePayment(b);
+      if (da === null && db === null) return 0;
+      if (da === null) return -1;
+      if (db === null) return 1;
+      return db - da;
+    });
+  } else {
+    visible = visible.slice().sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  if (!visible.length) {
+    listEl.innerHTML = '<div class="empty">No customers match your search/filter.</div>';
+    return;
+  }
+
+  listEl.innerHTML = visible.map(c => {
+    const bal = custBalance(c);
+    const overLimit = isOverLimit(c);
+    const metaHtml = c.paidInFullDate
+      ? `<span class="paid-full">Paid in full &mdash; ${c.paidInFullDate}</span>`
+      : `<span class="last-payment">${lastPaymentLabel(c)}</span>`;
+    return `
+      <button type="button" class="cust-card" data-action="openDetail" data-cust="${c.id}">
+        <span class="cust-card-top">
+          <span class="cust-name">${escapeHtml(c.name)}</span>
+          ${overLimit ? '<span class="badge-limit">Over limit</span>' : ''}
+        </span>
+        <span class="cust-card-bottom">
+          <span class="cust-balance ${bal === 0 ? 'zero' : ''}">${peso(bal)}</span>
+          ${metaHtml}
+        </span>
+      </button>
+    `;
+  }).join('');
+}
+
+function purchaseRowHtml(c, e, running) {
+  if (editingEntryId === e.id) {
+    return `
+      <div class="entry edit-row">
+        <div class="entry-form" style="margin:0; flex:1;">
+          <input class="item-in" data-edit="item" value="${escapeHtml(e.item)}" placeholder="Item" />
+          <input class="item-in" data-edit="brand" value="${escapeHtml(e.brand || '')}" placeholder="Brand (optional)" />
+          <input class="item-in" data-edit="size" list="sizeOptions" value="${escapeHtml(e.size || '')}" placeholder="Size" style="max-width:100px;" />
+          <input class="unit-in" data-edit="unit" list="unitOptions" value="${escapeHtml(e.unit || '')}" placeholder="Unit" />
+          <input class="qty-in" data-edit="qty" type="number" min="1" step="1" value="${e.qty}" />
+          <input class="price-in" data-edit="price" type="number" min="0" step="0.01" value="${e.price}" />
+          <button class="small" data-action="saveEdit" data-cust="${c.id}" data-entry="${e.id}">Save</button>
+          <button class="small ghost" data-action="cancelEdit" data-cust="${c.id}">Cancel</button>
+        </div>
+      </div>
+    `;
+  }
+  const meta = [e.brand, e.size].filter(Boolean).join(' &middot; ');
+  return `
+    <div class="entry ${e.paid ? 'paid' : ''}">
+      <span class="entry-info">
+        <span class="date">${e.date}${e.time ? ', ' + e.time : ''}</span>
+        <span class="item">${escapeHtml(e.item)}</span>
+        ${meta ? `<span class="item-meta">${meta}</span>` : ''}
+        <span class="qty-unit">&times;${e.qty}${e.unit ? ' ' + escapeHtml(e.unit) : ''} @ ${peso(e.price)}</span>
+      </span>
+      <span class="entry-right">
+        <span class="amt">${peso(e.amount)}</span>
+        <span class="run-bal">bal: ${peso(running)}</span>
+        <button class="icon-btn" data-action="editEntry" data-cust="${c.id}" data-entry="${e.id}" aria-label="Edit entry">Edit</button>
+        <button class="icon-btn" data-action="toggle" data-cust="${c.id}" data-entry="${e.id}" aria-label="Mark as ${e.paid ? 'unpaid' : 'paid'}">${e.paid ? 'Undo' : 'Paid'}</button>
+        <button class="icon-btn" data-action="delEntry" data-cust="${c.id}" data-entry="${e.id}" aria-label="Delete entry">Del</button>
+      </span>
+    </div>
+  `;
+}
+
+function paymentRowHtml(c, e, running) {
+  const shown = e.displayAmount != null ? e.displayAmount : Math.abs(e.amount);
+  const coveredMeta = (e.coveredItems && e.coveredItems.length)
+    ? `<span class="item-meta">Covers: ${e.coveredItems.map(escapeHtml).join(', ')}</span>`
+    : '';
+  const changeMeta = e.changeGiven > 0.004 ? `<span class="item-meta">Change given: ${peso(e.changeGiven)}</span>` : '';
+  return `
+    <div class="entry payment">
+      <span class="entry-info">
+        <span class="date">${e.date}${e.time ? ', ' + e.time : ''}</span>
+        <span class="item">Payment received</span>
+        ${coveredMeta}
+        ${changeMeta}
+      </span>
+      <span class="entry-right">
+        <span class="amt">&minus;${peso(shown)}</span>
+        <span class="run-bal">bal: ${peso(running)}</span>
+        <button class="icon-btn" data-action="delEntry" data-cust="${c.id}" data-entry="${e.id}" aria-label="Delete payment">Del</button>
+      </span>
+    </div>
+  `;
+}
+
+function computeAllocation(c, amount) {
+  let remaining = Number(amount) || 0;
+  const covered = [];
+  const unpaid = c.entries
+    .filter(e => e.type !== 'payment' && !e.paid)
+    .sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  for (const e of unpaid) {
+    if (remaining <= 0.004) break;
+    const owed = Number(e.amount);
+    if (owed <= remaining + 0.004) {
+      covered.push(e);
+      remaining -= owed;
+    } else {
+      break;
+    }
+  }
+  remaining = Math.max(0, remaining);
+  const itemsStillUnpaid = unpaid.length - covered.length;
+  // If nothing is left owing, any extra money is overpayment/change, not a negative balance.
+  const towardNext = itemsStillUnpaid > 0 ? remaining : 0;
+  const overpaid = itemsStillUnpaid > 0 ? 0 : remaining;
+  return { covered, towardNext, overpaid };
+}
+
+function renderDetail() {
+  const c = customers.find(x => x.id === currentCustId);
+  const detailEl = document.getElementById('detailView');
+  if (!c) { currentView = 'list'; currentCustId = null; render(); return; }
+
+  const bal = custBalance(c);
+  const overLimit = isOverLimit(c);
+  const purchases = totalPurchases(c);
+  const paidAmt = totalPaidAmount(c);
+  const txnCount = c.entries.length;
+
+  const sorted = c.entries.slice().sort((a, b) => (a.ts || 0) - (b.ts || 0));
+  let running = 0;
+  const rows = sorted.length ? sorted.map(e => {
+    if (e.type === 'payment') {
+      running += Number(e.amount);
+      return paymentRowHtml(c, e, running);
+    } else {
+      running += e.paid ? 0 : Number(e.amount);
+      return purchaseRowHtml(c, e, running);
+    }
+  }).join('') : '<div class="empty" style="padding:10px 0;">No transactions yet.</div>';
+
+  const removeBtnHtml = deleteConfirmId === c.id
+    ? `<span class="confirm-row">
+         <span class="confirm-text">Remove ${escapeHtml(c.name)}? This cannot be undone.</span>
+         <button class="small danger" data-action="confirmDelCust" data-cust="${c.id}">Yes, remove</button>
+         <button class="small ghost" data-action="cancelDelCust" data-cust="${c.id}">Cancel</button>
+       </span>`
+    : `<button class="small ghost" data-action="delCust" data-cust="${c.id}">Remove customer</button>`;
+
+  detailEl.innerHTML = `
+    <button type="button" class="ghost small" data-action="backToList">&larr; Back to customer list</button>
+    <div class="detail-head">
+      <h2>${escapeHtml(c.name)}</h2>
+      ${overLimit ? '<span class="badge-limit">Over limit</span>' : ''}
+    </div>
+    <div class="totals">
+      <div class="total-card">
+        <div class="label">Total purchases</div>
+        <div class="value">${peso(purchases)}</div>
+      </div>
+      <div class="total-card ok">
+        <div class="label">Total paid</div>
+        <div class="value">${peso(paidAmt)}</div>
+      </div>
+      <div class="total-card ${bal === 0 ? 'ok' : ''}">
+        <div class="label">Outstanding balance</div>
+        <div class="value">${peso(bal)}</div>
+      </div>
+      <div class="total-card">
+        <div class="label">Transactions</div>
+        <div class="value">${txnCount}</div>
+      </div>
+    </div>
+
+    <div class="section-title">Add a purchase</div>
+    <div class="entry-form">
+      <input class="item-in" type="text" placeholder="Item (e.g. rice, Coke)" data-field="item" />
+      <input class="item-in" type="text" placeholder="Brand (optional)" data-field="brand" />
+      <input class="item-in" type="text" list="sizeOptions" placeholder="Size (optional)" style="max-width:110px;" data-field="size" />
+      <input class="unit-in" type="text" list="unitOptions" placeholder="Unit" data-field="unit" />
+      <input class="qty-in" type="number" step="1" min="1" value="1" placeholder="Qty" data-field="qty" />
+      <input class="price-in" type="number" step="0.01" min="0" placeholder="Price" data-field="price" />
+      <button class="small" data-action="addEntry" data-cust="${c.id}">Add</button>
+    </div>
+
+    <div class="section-title">Record a payment</div>
+    <div class="payment-row">
+      <span>Paid</span>
+      <span>&#8369;</span>
+      <input class="payment-in" type="number" step="0.01" min="0" placeholder="0.00" />
+      <button class="small" data-action="applyPayment" data-cust="${c.id}">Apply payment</button>
+      <span class="payment-preview" id="detailPreview">${peso(0)} &minus; ${peso(bal)} = <span class="rem">${peso(bal)}</span></span>
+    </div>
+
+    <div class="section-title">Transaction history</div>
+    <div class="entries">${rows}</div>
+
+    <div class="remove-row">${removeBtnHtml}</div>
+  `;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function hideDupWarning() {
+  document.getElementById('dupWarning').style.display = 'none';
+  pendingDupName = null;
+}
+
+async function addCustomer(name) {
+  customers.push({ id: uid(), name, entries: [], createdAt: Date.now() });
+  document.getElementById('newName').value = '';
+  hideDupWarning();
+  render();
+  await save();
+}
+
+document.getElementById('addCustBtn').addEventListener('click', async () => {
+  const input = document.getElementById('newName');
+  const name = input.value.trim();
+  if (!name) return;
+  const dup = customers.find(c => c.name.trim().toLowerCase() === name.toLowerCase());
+  if (dup) {
+    pendingDupName = name;
+    document.getElementById('dupName').textContent = name;
+    document.getElementById('dupOpenBtn').dataset.cust = dup.id;
+    document.getElementById('dupWarning').style.display = 'flex';
+    return;
+  }
+  await addCustomer(name);
+});
+document.getElementById('newName').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('addCustBtn').click();
+});
+document.getElementById('newName').addEventListener('input', () => {
+  if (pendingDupName !== null) hideDupWarning();
+});
+document.getElementById('dupConfirmBtn').addEventListener('click', async () => {
+  if (!pendingDupName) return;
+  await addCustomer(pendingDupName);
+});
+document.getElementById('dupOpenBtn').addEventListener('click', (e) => {
+  const custId = e.target.dataset.cust;
+  if (!custId) return;
+  hideDupWarning();
+  document.getElementById('newName').value = '';
+  currentCustId = custId;
+  currentView = 'detail';
+  render();
+});
+document.getElementById('dupCancelBtn').addEventListener('click', () => {
+  hideDupWarning();
+});
+
+document.getElementById('filtersToggleBtn').addEventListener('click', () => {
+  const row = document.getElementById('filterRow');
+  const chevron = document.getElementById('filtersChevron');
+  const btn = document.getElementById('filtersToggleBtn');
+  const isOpen = row.style.display !== 'none';
+  row.style.display = isOpen ? 'none' : 'flex';
+  chevron.innerHTML = isOpen ? '&#9656;' : '&#9662;';
+  btn.setAttribute('aria-expanded', String(!isOpen));
+});
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  searchTerm = e.target.value;
+  render();
+});
+document.getElementById('sortSelect').addEventListener('change', (e) => {
+  sortBy = e.target.value;
+  render();
+});
+document.getElementById('filterSelect').addEventListener('change', (e) => {
+  filterBy = e.target.value;
+  render();
+});
+document.getElementById('limitEnabledCheck').addEventListener('change', (e) => {
+  limitEnabled = e.target.checked;
+  document.getElementById('limitAmountWrap').style.display = limitEnabled ? 'inline-flex' : 'none';
+  document.querySelector('#filterSelect option[value="overlimit"]').disabled = !limitEnabled;
+  render();
+});
+document.getElementById('limitInput').addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value);
+  creditLimit = isNaN(val) ? 0 : val;
+  render();
+});
+
+document.getElementById('pbAddBtn').addEventListener('click', async () => {
+  const nameIn = document.getElementById('pbItemName');
+  const priceIn = document.getElementById('pbItemPrice');
+  const name = nameIn.value.trim();
+  const price = parseFloat(priceIn.value);
+  if (!name || !price || price <= 0) return;
+  priceBook[name] = price;
+  nameIn.value = '';
+  priceIn.value = '';
+  render();
+  await savePriceBook();
+});
+
+document.getElementById('priceBookList').addEventListener('change', async (e) => {
+  if (!e.target.classList.contains('pb-price-in')) return;
+  const name = e.target.dataset.pbName;
+  const price = parseFloat(e.target.value);
+  if (!price || price <= 0) return;
+  priceBook[name] = price;
+  await savePriceBook();
+});
+
+document.getElementById('priceBookList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-action="pbRemove"]');
+  if (!btn) return;
+  delete priceBook[btn.dataset.pbName];
+  render();
+  await savePriceBook();
+});
+
+function bindOpenDetail(containerId) {
+  document.getElementById(containerId).addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action="openDetail"]');
+    if (!btn) return;
+    currentCustId = btn.dataset.cust;
+    currentView = 'detail';
+    editingEntryId = null;
+    deleteConfirmId = null;
+    render();
+  });
+}
+bindOpenDetail('customerList');
+bindOpenDetail('recentActivity');
+
+document.getElementById('detailView').addEventListener('input', (e) => {
+  if (e.target.classList.contains('item-in') && e.target.dataset.field === 'item') {
+    const form = e.target.closest('.entry-form');
+    if (!form) return;
+    const priceIn = form.querySelector('[data-field="price"]');
+    const match = Object.keys(priceBook).find(name => name.toLowerCase() === e.target.value.trim().toLowerCase());
+    if (match && priceIn && !priceIn.value) priceIn.value = priceBook[match];
+    return;
+  }
+  if (!e.target.classList.contains('payment-in')) return;
+  const c = customers.find(x => x.id === currentCustId);
+  if (!c) return;
+  const bal = custBalance(c);
+  const paid = parseFloat(e.target.value) || 0;
+  const remaining = Math.max(0, bal - paid);
+  const { covered, overpaid } = computeAllocation(c, paid);
+  const coverText = covered.length ? ` Covers: ${covered.map(x => escapeHtml(x.item)).join(', ')}.` : '';
+  const changeText = overpaid > 0.004 ? ` Change due: ${peso(overpaid)}.` : '';
+  const previewEl = document.getElementById('detailPreview');
+  if (previewEl) {
+    previewEl.innerHTML = `${peso(paid)} &minus; ${peso(bal)} = <span class="rem">${peso(remaining)}</span>${coverText}${changeText}`;
+  }
+});
+
+document.getElementById('detailView').addEventListener('click', async (e) => {
+  if (e.target.closest('[data-action="backToList"]')) {
+    currentView = 'list';
+    currentCustId = null;
+    editingEntryId = null;
+    deleteConfirmId = null;
+    render();
+    return;
+  }
+
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  const c = customers.find(x => x.id === currentCustId);
+  if (!c) return;
+
+  if (action === 'delCust') {
+    deleteConfirmId = c.id;
+    render();
+    return;
+  } else if (action === 'cancelDelCust') {
+    deleteConfirmId = null;
+    render();
+    return;
+  } else if (action === 'editEntry') {
+    editingEntryId = btn.dataset.entry;
+    render();
+    return;
+  } else if (action === 'cancelEdit') {
+    editingEntryId = null;
+    render();
+    return;
+  } else if (action === 'confirmDelCust') {
+    customers = customers.filter(x => x.id !== c.id);
+    deleteConfirmId = null;
+    currentView = 'list';
+    currentCustId = null;
+  } else if (action === 'saveEdit') {
+    const row = btn.closest('.entry');
+    const entry = c.entries.find(en => en.id === btn.dataset.entry);
+    if (entry) {
+      const item = row.querySelector('[data-edit="item"]').value.trim();
+      const brand = row.querySelector('[data-edit="brand"]').value.trim();
+      const size = row.querySelector('[data-edit="size"]').value.trim();
+      const unit = row.querySelector('[data-edit="unit"]').value.trim();
+      const qty = parseFloat(row.querySelector('[data-edit="qty"]').value) || 1;
+      const price = parseFloat(row.querySelector('[data-edit="price"]').value);
+      if (item && price > 0) {
+        entry.item = item; entry.brand = brand; entry.size = size; entry.unit = unit;
+        entry.qty = qty; entry.price = price; entry.amount = qty * price;
+      }
+    }
+    editingEntryId = null;
+    updatePaidInFull(c);
+  } else if (action === 'applyPayment') {
+    const container = btn.closest('.payment-row');
+    const payIn = container.querySelector('.payment-in');
+    const amt = parseFloat(payIn.value);
+    if (!amt || amt <= 0) return;
+    const { covered, towardNext, overpaid } = computeAllocation(c, amt);
+    covered.forEach(en => { en.paid = true; en.paidAt = Date.now(); });
+    c.entries.push({
+      id: uid(), type: 'payment', item: 'Payment received', amount: -towardNext,
+      displayAmount: amt,
+      coveredItems: covered.map(en => en.item),
+      coveredIds: covered.map(en => en.id),
+      changeGiven: overpaid > 0.004 ? overpaid : 0,
+      date: todayStr(), time: timeStr(), ts: Date.now(), paid: false
+    });
+    c.lastPaymentTs = Date.now();
+    updatePaidInFull(c);
+  } else if (action === 'toggle') {
+    const entry = c.entries.find(en => en.id === btn.dataset.entry);
+    if (entry) {
+      entry.paid = !entry.paid;
+      if (entry.paid) {
+        entry.paidAt = Date.now();
+        c.lastPaymentTs = Date.now();
+      } else {
+        entry.paidAt = null;
+      }
+    }
+    updatePaidInFull(c);
+  } else if (action === 'delEntry') {
+    const removed = c.entries.find(en => en.id === btn.dataset.entry);
+    if (removed && removed.type === 'payment' && removed.coveredIds && removed.coveredIds.length) {
+      removed.coveredIds.forEach(id => {
+        const target = c.entries.find(en => en.id === id);
+        if (target) { target.paid = false; target.paidAt = null; }
+      });
+    }
+    c.entries = c.entries.filter(en => en.id !== btn.dataset.entry);
+    updatePaidInFull(c);
+  } else if (action === 'addEntry') {
+    const form = btn.closest('.entry-form');
+    const item = form.querySelector('[data-field="item"]').value.trim();
+    const brand = form.querySelector('[data-field="brand"]').value.trim();
+    const size = form.querySelector('[data-field="size"]').value.trim();
+    const unit = form.querySelector('[data-field="unit"]').value.trim();
+    const qty = parseFloat(form.querySelector('[data-field="qty"]').value) || 1;
+    const price = parseFloat(form.querySelector('[data-field="price"]').value);
+    if (!item || !price || price <= 0) return;
+    c.entries.push({ id: uid(), item, brand, size, unit, qty, price, amount: qty * price, date: todayStr(), time: timeStr(), ts: Date.now(), paid: false });
+    updatePaidInFull(c);
+    const existingKey = Object.keys(priceBook).find(name => name.toLowerCase() === item.toLowerCase());
+    priceBook[existingKey || item] = price;
+    await savePriceBook();
+  }
+  render();
+  await save();
+});
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(err => console.warn('SW registration failed', err));
+  });
+}
+
+load();
+</script>
+</body>
+</html>
