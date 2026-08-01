@@ -13,5 +13,13 @@
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    { "src": "screenshots/mobile-1.jpg", "sizes": "1079x2103", "type": "image/jpeg", "form_factor": "narrow", "label": "Dashboard and customer list" },
+    { "src": "screenshots/mobile-2.jpg", "sizes": "972x2049", "type": "image/jpeg", "form_factor": "narrow", "label": "Customer list with balances" },
+    { "src": "screenshots/mobile-3.jpg", "sizes": "974x2046", "type": "image/jpeg", "form_factor": "narrow", "label": "Customer details page" },
+    { "src": "screenshots/desktop-1.png", "sizes": "1600x778", "type": "image/png", "form_factor": "wide", "label": "Customer details on desktop" },
+    { "src": "screenshots/desktop-2.png", "sizes": "1600x778", "type": "image/png", "form_factor": "wide", "label": "Customer list on desktop" },
+    { "src": "screenshots/desktop-3.png", "sizes": "1600x778", "type": "image/png", "form_factor": "wide", "label": "Dashboard on desktop" }
   ]
 }
